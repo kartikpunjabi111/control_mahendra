@@ -1,3 +1,13 @@
+/*
+
+Node Name   - 	LQRnonconstv
+Publishers  - 	steercontrol
+Subscribers -	base_pose_ground_truth
+				astroid_path
+				base_pose_ground_truth"
+Authors :    	Shobhit Saheb Dey & Kartik Punjabi
+*/
+
 // ld = 5.0 k = 0.2  
 // 2.5 0.07 /Cr,mCf
 
@@ -56,6 +66,7 @@ void discretise();
 void riccati();
 //void steer();
 beginner_tutorials::Control v;
+std_msgs::Float64 msg;
 double wheelBase=1.983;
 struct path_point{
 	double px,py,d; // path points and d= distance
@@ -74,18 +85,18 @@ std_msgs::Float64 steer;
 double minD;
 path_point pointSearch(){
 	path_point temp,goal;	
-	cout<<incomePath.size()<<endl;
-	//cout<<"prevIndex entered in the function: "<<index<<endl;
+	//<<incomePath.size()<<endl;
+	////<<"prevIndex entered in the function: "<<index<<endl;
 
 		int index=0;
 		temp.px=incomePath[0].position.x;
-		//cout<<"x coord: "<<temp.px<<endl;
+		////<<"x coord: "<<temp.px<<endl;
 		temp.py=incomePath[0].position.y;
-		//cout<<"y coord: "<<temp.py<<endl;
+		////<<"y coord: "<<temp.py<<endl;
 		temp.d=sqrt(pow(x-temp.px,2)+pow(y-temp.py,2));
-		//cout<<"distance from car: "<<temp.d<<endl;
+		////<<"distance from car: "<<temp.d<<endl;
 		minD=temp.d;
-		//cout<<"finding closest point"<<endl;
+		////<<"finding closest point"<<endl;
 
 		for(int i=0;i<incomePath.size();i++){
 			
@@ -93,24 +104,27 @@ path_point pointSearch(){
 			{
 				index=i;
 				minD=sqrt(pow(x-incomePath[i].position.x,2)+pow(y-incomePath[i].position.y,2));
-					//cout<<"if me chala 1212"<<endl;
+					////<<"if me chala 1212"<<endl;
 
 			}
 		}
-		//cout<<"got closest point"<<endl;
+		////<<"got closest point"<<endl;
 		goal.index=index;
-		//cout<<"Index found: "<<goal.index<<endl;
+		////<<"Index found: "<<goal.index<<endl;
 		goal.d=minD;
+		cout<<"cross track error: "<<goal.d<<endl;
+		msg.data=goal.d;
+
 		goal.px=incomePath[index].position.x;
 		goal.py=incomePath[index].position.y;	
 		goal.slope=atan2(incomePath[index+1].position.y-goal.py,incomePath[index+1].position.x-goal.px);
-		//cout<<"calculated slope"<<endl;
+		////<<"calculated slope"<<endl;
 		if((x*goal.py-y*goal.px)>0)
 			direction=-1;
 		else
 			direction=1;
 		prevIndex=goal.index;
-		cout<<"Direction : "<<direction<<endl;
+		//<<"Direction : "<<direction<<endl;
 	
 	
 	return goal;
@@ -120,8 +134,10 @@ void LQR(){
 	discretise();
 	riccati();
 
-	if(sec1!=sec0)
+	if(sec1!=sec0){
 		steer.data=-K(0,0).real()*error1-K(0,1).real()*(errorDiff/(sec1-sec0))-K(0,2).real()*ryaw1-K(0,3).real()*(ryawDiff/(sec1-sec0));
+		steer.data=0.3*steer.data;
+	}
 	else
 		steer.data=0;
 	steer.data=direction*(steer.data)/3.14;
@@ -132,24 +148,22 @@ void LQR(){
 	}
 	else if(steer.data<-1)
 		{steer.data=-1;}
+	cout<<"Steering angle calculated: "<<steer.data<<endl;
 
-
-	
-
-	cout<<"steering angle: "<<steer.data<<endl;
+	//<<"steering angle: "<<steer.data<<endl;
 }
 void discretise()
 		{
-			cout<<"discretising the matrices"<<endl;
+			//<<"discretising the matrices"<<endl;
 			ComplexEigenSolver<MatrixXcd> ces;
 			ces.compute(A);
-			eigVal=ces.eigenvalues();
+			eigVal=ces.eigenvalues();	
 			eigVect=ces.eigenvectors();
 			for(int i=0;i<4;i++){
 				for(int j=0;j<4;j++){
 					if(i==j){
-						diagA(i,j)=exp(eigVal(i,0));
-						diagB(i,j)=exp(eigVal(i,0))-complex<double>(1,0);
+						diagA(i,j)=exp(0.01*eigVal(i,0));
+						diagB(i,j)=exp(0.01*eigVal(i,0))-complex<double>(1,0);
 					}
 					else{
 						diagA(i,j)=0;
@@ -159,24 +173,26 @@ void discretise()
 			}
 			Ad=eigVect.inverse()*diagA*eigVect;
 			Bd=eigVect.inverse()*diagB*eigVect*B;
-			//cout<<"discretised A: "<<Ad<<endl;
-			//cout<<"discretised B: "<<Bd<<endl;
+			////<<"discretised A: "<<Ad<<endl;
+			////<<"discretised B: "<<Bd<<endl;
 		}
 void riccati(){
-	//cout<<"solving riccati"<<endl;
+	////<<"solving riccati"<<endl;
 	P<<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0;
 	P0<<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0;
-Q<<5000000,0,0,0,0,0,0,0,20000,0,0,0,0,0,0,0;
+Q<<5000000,0,0,0,0,0,0,0,200,0,0,0,0,0,0,0;
 R<<1;
+
 			complex<double> error;
 			do 
 			{P0=P;
 				P=Ad.transpose()*P*Ad-Ad.transpose()*P*Bd*(R+Bd.transpose()*P*Bd).inverse()*Bd.transpose()*P*Ad+Q;
-				error=sqrt(0.5*((P-P0).transpose()*(P-P0)).trace());
-			}while(abs(error)<0.005);
+				error=sqrt(((P-P0).transpose()*(P-P0)).trace());
+
+			}while(abs(error)<0.0005);
 
 				K=(R+Bd.transpose()*P*Bd).inverse()*Bd.transpose()*P*Ad;
-				//cout<<"Calculated K: "<<K<<endl;
+				////<<"Calculated K: "<<K<<endl;
 		}
 
 void posCallBack(const nav_msgs::Odometry::ConstPtr &msg){
@@ -189,20 +205,20 @@ void posCallBack(const nav_msgs::Odometry::ConstPtr &msg){
 	double q4= msg->pose.pose.orientation.w;
 	double siny=2.0*(q4*q3+q1*q2),cosy=1-2*(q2*q2);	
 	ayaw=atan2(siny,cosy);
-	//cout<<"got position and orientation"<<endl;
+	////<<"got position and orientation"<<endl;
 	ryaw0=ryaw1;
-	//cout<<"prevIndex: "<<prevIndex<<endl;
+	////<<"prevIndex: "<<prevIndex<<endl;
 	x=msg->pose.pose.position.x;
 	y=msg->pose.pose.position.y;
-	x=x+0.5*(wheelBase)*cos(ayaw);
-	y=y+0.5*(wheelBase)*sin(ayaw);
+	// x=x+0.5*(wheelBase)*cos(ayaw);
+	// y=y+0.5*(wheelBase)*sin(ayaw);
 	if(incomePath.size()>0)
 		p=pointSearch();
 	else{
-		//cout<<"path yet not recieved"<<endl;
+		////<<"path yet not recieved"<<endl;
 		return;
 	}
-	//cout<<"got the closest point"<<endl;
+	////<<"got the closest point"<<endl;
 	ryaw0=atan2(p.slope,1)-ayaw;		
 	ryawDiff=ryaw1-ryaw0;	
 	
@@ -211,7 +227,7 @@ void posCallBack(const nav_msgs::Odometry::ConstPtr &msg){
 	errorDiff=error1-error0;
 	sec0=0;
 	sec1=0.005;
-	//cout<<"sec0: "<<sec0<<" sec1: "<<sec1<<endl;
+	////<<"sec0: "<<sec0<<" sec1: "<<sec1<<endl;
 	if(sec0==sec1){
 		yawRate=0;
 		errorRate=0;
@@ -220,38 +236,38 @@ void posCallBack(const nav_msgs::Odometry::ConstPtr &msg){
 		yawRate=ryawDiff/(sec1-sec0);
 		errorRate=errorDiff/(sec1-sec0);
 	}
-	//cout<<"ready to run LQR"<<endl;
+	////<<"ready to run LQR"<<endl;
 	LQR();
 }
 
 void velCallBack(const nav_msgs::Odometry::ConstPtr msg){
 vx=sqrt(pow(msg->twist.twist.linear.x,2)+pow(msg->twist.twist.linear.y,2));
-cout<<"Velocity calculated: "<<vx<<endl;
+//<<"Velocity calculated: "<<vx<<endl;
 A << 0,1,0,0,
 	0,-(Cr+Cf)/(M*vx),(Cf+Cr)/M,(lr*Cr-lf*Cf)/(M*vx),
 	0,0,0,1,
 	0,(lr*Cr-lf*Cf)/(Iz*vx),-(lr*Cr-lf*Cf)/Iz,-(lf*lf*Cf+lr*lr*Cr)/(Iz*vx);
 
-//cout<<"A initialized"<<endl;
-cout<<A<<endl;
+////<<"A initialized"<<endl;
+//<<A<<endl;
 B << 0,Cf/M,0,lf*Cf/Iz;
-//cout<<"B initialized: "<<endl;
-//cout<<B<<endl;
+////<<"B initialized: "<<endl;
+////<<B<<endl;
 }
 
 void call(const nav_msgs::Path::ConstPtr msg){
-	//cout<<"path liya "<<endl;
+	////<<"path liya "<<endl;
 	incomePath.clear();
 	// incomePath=*msg;
 	int i=0;
-	//cout<<"Incoming PATH"<<endl;
+	////<<"Incoming PATH"<<endl;
 	for(i=0;i<msg->poses.size();i++){
 		incomePath.push_back(msg->poses[i].pose);
-		//cout<<msg->poses[i].pose.position.x<<endl;
+		////<<msg->poses[i].pose.position.x<<endl;
 	}
 
 	// for(int i=0;i<incomePath.size();i++){
-	// 	cout<<" "<<incomePath[i]<<endl;
+	// 	//<<" "<<incomePath[i]<<endl;
 	// }
 	
 }
@@ -291,13 +307,15 @@ int main(int argc, char **argv)
 	
 	ros::Subscriber sub = n1.subscribe<nav_msgs::Odometry>("base_pose_ground_truth",1,velCallBack);
 
+	ros::Publisher bag_pub = n1.advertise<std_msgs::Float64>("Cross_track_bag",1);
+
 	ros::Rate loop_rate(10);
 
 	
 	while(ros::ok())
 	{		
 		p.publish(steer);
-		
+		bag_pub.publish(msg);
 		ros::spinOnce();
 		
 		loop_rate.sleep();
