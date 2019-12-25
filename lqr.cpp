@@ -1,4 +1,4 @@
-	#include "ros/ros.h"
+#include "ros/ros.h"
 #include "std_msgs/Float64.h"
 #include "nav_msgs/Odometry.h"
 #include "geometry_msgs/PoseStamped.h"
@@ -269,25 +269,7 @@ void call(const nav_msgs::Path::ConstPtr msg){
 	
 }
 
-// void callback( nav_msgs::Odometry car_cod ){
-	
-// 	a = car_cod.pose.pose.position.x;
-// 	b = car_cod.pose.pose.position.y;
 
-
-//     xx = car_cod.pose.pose.orientation.x;
-//     yy = car_cod.pose.pose.orientation.y;
-// 	zz = car_cod.pose.pose.orientation.z;
-// 	ww = car_cod.pose.pose.orientation.w;
-
-// 	distance();
-
-// 	steer();
-
-// 	ROS_INFO("steer = %lf , d = %f, m = %lf, n = %lf, e = %f ", v.steer, d, m, n, e);
-
-	
-// }
 
 
 int main(int argc, char **argv)
